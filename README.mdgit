@@ -1,0 +1,1 @@
+"# school_managment_by_asyncpg"  initgit add README.mdgit commit -m "first commit"git branch -M maingit remote add origin https://github.com/AminProgrammmer/school_managment_by_asyncpg.gitgit push -u origin main?
