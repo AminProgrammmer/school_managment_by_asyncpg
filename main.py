@@ -12,6 +12,7 @@ app.include_router(lifespan.router)
 # app.include_router(major.router)
 # app.include_router(book.router)
 app.include_router(student.router)
+# app.include_router(level.router)
 
 @app.get("/")
 def Home():
