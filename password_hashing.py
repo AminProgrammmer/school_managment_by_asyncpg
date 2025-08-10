@@ -4,7 +4,7 @@ pwd_cxt = CryptContext(schemes='bcrypt',deprecated = 'auto')
 
 class Hash():
     @staticmethod
-    def bcrypt(password):
+    def generate_password_hash(password):
         return pwd_cxt.hash(password)
     
     

@@ -1,25 +1,42 @@
-from authentication.authentication import RoleCheck
+from fastapi import APIRouter, Depends,Query,status
+from database.db import get_pg_conn
+from repositories import classes
+from schema import ClassBase,ClassOutput
+import asyncpg
 
-from fastapi import APIRouter,Depends
-from sqlalchemy.orm.session import Session
-from database.db import get_db
-from database import db_classes
-from schema import Class_Base
-from authentication.authentication import RoleCheck
-router = APIRouter(prefix="/classes",tags=["class"])
+router = APIRouter(prefix="/Classes",tags=['classes'])
 
 @router.get("")
-def classes(db:Session=Depends(get_db)):
-    return db_classes.get_all_class(db=db)
+async def list_classes(db:asyncpg.pool.Pool=Depends(get_pg_conn),
+                       page:int=Query(1),
+                       page_size:int=Query(10,le=100)
+                       ):
+    class_crud =  classes.ClassRepository(db=db)
+    return await class_crud.get_all_records(page=page,page_size=page_size,model=ClassOutput.model_fields)
 
-@router.post("")
-def add_class(data_class:Class_Base ,db:Session=Depends(get_db),role = Depends(RoleCheck(True))):
-    return db_classes.add_class(data=data_class,db=db)
+@router.get("/{id}")
+async def get_class_by_id(id : int,db:asyncpg.pool.Pool=Depends(get_pg_conn)):
+    class_crud =  classes.ClassRepository(db=db)
+    return await class_crud.get_record_by_id(id=id)
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+async def add_class(
+    data: ClassBase,
+    db: asyncpg.pool.Pool = Depends(get_pg_conn)):
+    class_crud = classes.ClassRepository(db=db)
+    return await class_crud.insert(data=data.model_dump())
 
 @router.delete("/{id}")
-def remove_class(id:int,db:Session=Depends(get_db),role = Depends(RoleCheck(True))):
-    return db_classes.delete_class(id=id,db=db)
+async def remove_class(
+    id: int,
+    db: asyncpg.pool.Pool = Depends(get_pg_conn)):
+    class_crud = classes.ClassRepository(db=db)
+    return await class_crud.remove_item(id=id)
 
 @router.put("/{id}")
-def edit_class(id:int,data:Class_Base,db:Session=Depends(get_db),role = Depends(RoleCheck(True))):
-    return db_classes.edit_class(id,data,db)
+async def update_class(
+    id: int,
+    data: ClassBase,
+    db: asyncpg.pool.Pool = Depends(get_pg_conn)):
+    class_crud = classes.ClassRepository(db=db)
+    return await class_crud.update_record(id=id, data=data.model_dump())

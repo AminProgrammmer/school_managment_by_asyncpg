@@ -1,19 +1,13 @@
 from fastapi import FastAPI
 # from authentication import authentication
-from routers import lifespan,student
+from lifespan import lifespan
+from routers import student,level,majors,books,classes,personnel
 
 
-app = FastAPI()
-app.include_router(lifespan.router)
-# app.include_router(authentication.router)
-# app.include_router(admins.router)
-# app.include_router(classes.router)
-# app.include_router(grade.router)
-# app.include_router(major.router)
-# app.include_router(book.router)
+app = FastAPI(lifespan=lifespan)
+app.include_router(personnel.router)
 app.include_router(student.router)
-# app.include_router(level.router)
-
-@app.get("/")
-def Home():
-    return {"hello":"hello"}
+app.include_router(level.router)
+app.include_router(majors.router)
+app.include_router(books.router)
+app.include_router(classes.router)

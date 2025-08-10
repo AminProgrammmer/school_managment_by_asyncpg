@@ -1,14 +1,16 @@
 from fastapi import APIRouter, Depends, status,Query
 from database.db import get_pg_conn
-from schema import Student_Base
-from services import student_service
+from schema import StudentBase,StudentOutput
+from repositories import student
 import asyncpg
 
-router = APIRouter(prefix="/Students", tags=["student"])
+router = APIRouter(prefix="/Students", tags=["students"])
 
 @router.get("/{id}")
-async def student_detail(id: int, db: asyncpg.Connection = Depends(get_pg_conn)):
-    return await student_service.get_student_by_id(id, db)
+async def student_detail(id: int, db: asyncpg.Connection = Depends(get_pg_conn)) -> dict:
+    student_crud = student.StudentRepository(db=db)
+    return await student_crud.get_record_by_id(id=id)
+
 
 @router.get("")
 async def list_student(
@@ -16,18 +18,22 @@ async def list_student(
                        page_size : int = Query(10,ge=1,le=100),
                        db: asyncpg.pool.Pool = Depends(get_pg_conn)
                        ) -> dict:
-    return await student_service.get_all_students(page=page,page_size=page_size,db=db)
+    student_crud = student.StudentRepository(db=db)
+    return await student_crud.get_all_records(page=page,page_size=page_size,model=StudentOutput.model_fields)
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def add_student(data: Student_Base, db: asyncpg.pool.Pool = Depends(get_pg_conn)) -> dict:
-    return await student_service.add_student(data, db)
+async def add_student(data: StudentBase, db: asyncpg.pool.Pool = Depends(get_pg_conn)) -> dict:
+    student_crud = student.StudentRepository(db=db)
+    return await student_crud.insert(data=data.model_dump())
 
 
 @router.delete("/{id}")
 async def remove_student(id: int, db: asyncpg.pool.Pool = Depends(get_pg_conn)) ->dict:
-    return await student_service.remove_student(id, db)
+    student_crud = student.StudentRepository(db=db)
+    return await student_crud.remove_item(id=id)
 
 @router.put("/{id}")
-async def edit_student(id: int, data: Student_Base, db: asyncpg.pool.Pool = Depends(get_pg_conn)) -> Student_Base:
-    return await student_service.edit_student(id, data, db)
+async def edit_student(id: int, data: StudentBase, db: asyncpg.pool.Pool = Depends(get_pg_conn)) -> StudentBase:
+    student_crud = student.StudentRepository(db=db)
+    return await student_crud.update_record(id=id,data=data.model_dump())

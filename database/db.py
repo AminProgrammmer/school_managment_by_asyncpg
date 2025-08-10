@@ -1,31 +1,36 @@
 import asyncpg
-import asyncio
-from fastapi import FastAPI
+from fastapi.requests import Request
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+class DBManager:
+    def __init__(self,config:dict):
+        self._config = config
+        self._pool : asyncpg.pool.Pool | None = None
+        
+        
+    async def connect(self):
+        self._pool = await asyncpg.create_pool(**self._config)
+        
+    async def disconnect(self):
+        if self._pool:
+            await self._pool.close()
+            
+    async def acquire(self):
+        if not self._pool:
+            raise RuntimeError("Database  pool not initialized")
+        return await self._pool.acquire()
+    
+    async def release(self, conn: asyncpg.Connection):
+        if self._pool:
+            await self._pool.release(conn)
+    def get_pool(self) -> asyncpg.Pool:
+        if not self._pool:
+            raise RuntimeError("Pool not initialized")
+        return self._pool
 
-config = {
-        'user':'postgres',
-        'password':'Aa123456@',
-        'database':'school_managment',
-        'host':'localhost',
-        'port': 5432
-}
-
-pool = None
-# async def get_connection():
-#     conn = await asyncpg.connect(**config)
-#     print("connected to the database")
-#     await conn.close()
-#     print("connection closed....")
-
-async def init_db_pool():
-    global pool
-    pool = await asyncpg.create_pool(**config)
-    print("Pool Initialized...")
-
-async def close_db_pool():
-    await pool.close()
-    print("❌ Pool closed")
-
-async def get_pg_conn():
-    async with pool.acquire() as conn:
+async def get_pg_conn(request:Request) -> AsyncGenerator[asyncpg.Connection, None]:
+    conn = await request.app.state.db.acquire()
+    try :
         yield conn
+    finally:
+        await request.app.state.db.release(conn)
