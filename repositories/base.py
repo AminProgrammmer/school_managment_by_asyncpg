@@ -1,6 +1,6 @@
 import asyncpg
 from fastapi import HTTPException,status
-
+from password_hashing import Hash
 
 
 async def pagination(db: asyncpg.pool.Pool,
@@ -59,18 +59,23 @@ class BaseRepository:
     async def update_record(self,id:int,data:dict):
         if not data:
             raise HTTPException(status_code=400, detail="no data to update")
+        data_copy = data.copy()
+        if "password" in data_copy and data_copy["password"] is not None:
+            plain = data_copy["password"]
+            pw_hash = await Hash.generate_password_hash(password=plain)
+            data_copy["password"] = pw_hash
+        keys = list(data_copy.keys())
+        values = list(data_copy.values())
+        placeholders =",".join(f"{key} = ${i+1}" for i , key in enumerate(keys))
+        values.append(id)
+        where_placeholder = f"${len(values)}"
+        query = f"""
+        UPDATE {self.table_name}
+        SET {placeholders}
+        WHERE id = {where_placeholder}
+        RETURNING *
+        """
         try:
-            keys = list(data.keys())
-            values = list(data.values())
-            placeholders =",".join(f"{key} = ${i+1}" for i , key in enumerate(keys))
-            values.append(id)
-            where_placeholder = f"${len(values)}"
-            query = f"""
-            UPDATE {self.table_name}
-            SET {placeholders}
-            WHERE id = {where_placeholder}
-            RETURNING *
-            """
             updating_row = await self.db.fetchrow(query,*values)
             if not updating_row:
                 raise HTTPException(status_code=404, detail="item not found for update")
@@ -125,8 +130,13 @@ class BaseRepository:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="unexpected error")
     
     async def insert(self,data:dict) -> dict:
-        keys = data.keys()
-        values = list(data.values())
+        data_copy = data.copy()
+        if "password" in data_copy and data_copy["password"] is not None:
+            plain = data_copy["password"]
+            pw_hash = await Hash.generate_password_hash(password=plain)
+            data_copy["password"] = pw_hash
+        keys = data_copy.keys()
+        values = list(data_copy.values())
         columns = ",".join(keys)
         placeholders = ",".join(f"${i+1}" for i in range(len(values)))
         query = f"INSERT INTO {self.table_name}({columns}) VALUES({placeholders}) RETURNING *"

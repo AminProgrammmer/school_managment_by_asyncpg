@@ -8,6 +8,14 @@ from validators import (validate_national_code,
                         validate_school_level)
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    national_code: str | None = None
+
+
 class ParentEnum(str,Enum):
     """this is an enum. use for parent type"""
     father = "Father"
@@ -30,6 +38,7 @@ class ParentBase(BaseModel):
         return validate_phone_number(value)
 
 class PersonnelOutput(BaseModel):
+    id : int
     name : str
     lastname : str
     national_code : str
