@@ -17,6 +17,7 @@ async def add_personnel(data:PersonnelBase,
 @router.get("")
 async def get_personnels(page : int = Query(1),
                          page_size : int = Query(10,le=100),
+                         current_user = Depends(get_current_user),
                          db:asyncpg.pool.Pool = Depends(get_pg_conn)):
     personnel_crud = personnel.PersonnelRepository(db=db)
     return await personnel_crud.get_all_records(page=page,page_size=page_size,model=PersonnelOutput.model_fields)

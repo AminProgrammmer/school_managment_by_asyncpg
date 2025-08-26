@@ -6,14 +6,21 @@ from validators import (validate_national_code,
                         validate_email,
                         validate_password,
                         validate_school_level)
-
+from typing import Optional
 
 class Token(BaseModel):
     access_token: str
     token_type: str
-
+    
 class TokenData(BaseModel):
     national_code: str | None = None
+
+class TokenPayload(BaseModel):
+    sub: Optional[str] = None
+    exp: Optional[int] = None
+    class Config:
+        extra = "ignore"
+    
 
 
 class ParentEnum(str,Enum):
