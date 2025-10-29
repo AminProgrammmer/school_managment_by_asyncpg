@@ -1,5 +1,7 @@
 import asyncpg
 from fastapi import HTTPException,status
+from sqlalchemy import column, values
+
 from password_hashing import Hash
 
 

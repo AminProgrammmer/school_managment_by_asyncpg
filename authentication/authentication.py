@@ -11,10 +11,10 @@ from jose import jwt,JWTError
 from schema import TokenPayload
 from datetime import timedelta,datetime,timezone
 load_dotenv()
-
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_TIME = 5
+ACCESS_TOKEN_EXPIRE_TIME = int(os.getenv("ACCESS_TOKEN_EXPIRE_TIME"))
+REFRESH_TOKEN_EXPIRE_DAY = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAY"))
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 async def get_user(db:asyncpg.pool.Pool,national_code : str):
@@ -52,8 +52,9 @@ def create_access_token(data:dict,
     encoded_jwt = jwt.encode(to_encode,SECRET_KEY,algorithm=ALGORITHM)
     return  encoded_jwt
 
+
 def create_refresh_token(subject:str):
-    expire = datetime.now(timezone.utc) + timedelta(days=7)
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAY)
     jti = str(uuid.uuid4())
     to_encode = {
         "sub" : subject,
@@ -65,20 +66,27 @@ def create_refresh_token(subject:str):
     encoded_jwt = jwt.encode(claims=to_encode,key=SECRET_KEY,algorithm=ALGORITHM)
     return encoded_jwt , jti , expire
 
-async def verify_refresh_token(db:asyncpg.pool.Pool,token: str):
+async def revoke_refresh_token(db:asyncpg.Connection,jti:uuid.UUID):
+    await db.execute("UPDATE refresh_tokens SET is_revoked = TRUE WHERE jti = $1",jti)
+
+
+async def verify_refresh_token(db: asyncpg.Connection, token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("token_type") != "refresh":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
-        token_data = await db.fetchrow(
-            "SELECT jti, expires_at, is_revoked FROM refresh_tokens WHERE jti = $1",
-            uuid.UUID(payload["jti"])
-        )
-        if not token_data or token_data["is_revoked"] or token_data["expires_at"] < datetime.now(timezone.utc):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="expire token type")
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        jti = uuid.UUID(payload["jti"])
+        token_data = await db.fetchrow("""
+        select expires_at,is_revoked from refresh_tokens where jti = $1
+        """, jti)
+        if not token_data or token_data["expires_at"] < datetime.now(timezone.utc) or token_data["is_revoked"] != False:
+            raise HTTPException(status_code=401, detail="Token not found or maybe expired")
         return payload
+
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+        raise HTTPException(status_code=401, detail="Invalid token format or signature")
+    except Exception:
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 def decode_token(token: str) -> Dict[str, Any]:
     payload = jwt.decode(
@@ -112,4 +120,44 @@ async def get_current_user(db:asyncpg.pool.Pool = Depends(get_pg_conn),
         raise credentials_exception
     return user
 
-   
+
+async def validate_teacher(db: asyncpg.pool.Pool = Depends(get_pg_conn),
+                           token: str = Depends(oauth2_scheme)):
+    credential_error = HTTPException(detail="could not validate credential",
+                                     status_code=status.HTTP_401_UNAUTHORIZED,
+                                     headers={"WWW-Authenticate": "Bearer"})
+    try:
+        payload = decode_token(token=token)
+        token_data = TokenPayload(**payload)
+        user_id = int(token_data.sub)
+        if datetime.fromtimestamp(token_data.exp, tz=timezone.utc) < datetime.now(timezone.utc):
+            raise credential_error
+        query = "select is_teacher from personnel where id = $1"
+        is_teacher = await db.fetchrow(query, user_id)
+        if is_teacher["is_teacher"] != True:
+            raise credential_error
+        return is_teacher["is_teacher"]
+    except JWTError as e:
+        print(e)
+        raise credential_error
+
+async def validate_manager(db : asyncpg.pool.Pool = Depends(get_pg_conn),
+                           token : str = Depends(oauth2_scheme)):
+    
+    credential_error = HTTPException(detail="could not validate credential",
+                                     status_code=status.HTTP_401_UNAUTHORIZED,
+                                     headers={"WWW-Authenticate" : "Bearer"})
+    try :
+        payload = decode_token(token=token)
+        token_data = TokenPayload(**payload)
+        user_id = int(token_data.sub)
+        if datetime.fromtimestamp(token_data.exp,tz=timezone.utc) < datetime.now(timezone.utc):
+            raise credential_error
+        query = "select is_manager from personnel where id = $1"
+        is_manager = await db.fetchrow(query,user_id)
+        if is_manager["is_manager"] != True:
+            raise credential_error
+        return is_manager["is_manager"]
+    except JWTError as e:
+        print(e)
+        raise credential_error

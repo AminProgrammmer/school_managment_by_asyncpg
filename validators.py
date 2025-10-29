@@ -50,3 +50,8 @@ def validate_phone_number(value:str) -> str:
     if not pattern.match(value):
         raise ValueError("your phone number is not valid")
     return value
+    
+def validate_gpa(value:float):
+    if not value < 0 and not value > 20:
+        return value
+    raise ValueError("you must be enter number between 0 to 20")

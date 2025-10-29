@@ -1,11 +1,14 @@
 import re
 from pydantic import BaseModel,field_validator,EmailStr
 from enum import Enum
+
+from sqlalchemy import values
+
 from validators import (validate_national_code,
                         validate_phone_number,
                         validate_email,
                         validate_password,
-                        validate_school_level)
+                        validate_school_level, validate_gpa)
 from typing import Optional
 
 class Token(BaseModel):
@@ -22,23 +25,67 @@ class TokenPayload(BaseModel):
         extra = "ignore"
     
 
+class Gradeout(BaseModel):
+    id : int
+    term1_continus : float
+    term1_final : float
+    term2_continus : float
+    term2_final : float
+    student_id : int
+    course_id : int
 
-class ParentEnum(str,Enum):
-    """this is an enum. use for parent type"""
-    father = "Father"
-    mother = "Mother"
+class GradeBase(BaseModel):
+    term1_continus : float
+    term1_final : float
+    term2_continus : float
+    term2_final : float
+    student_id : int
+    course_id : int
+    @field_validator("term1_continus","term2_continus","term1_final","term2_final",mode="after")
+    @classmethod
+    def validate_gpa(cls,value:float):
+        return validate_gpa(value=value)
 
-class ParentBase(BaseModel):
-    parent_type : ParentEnum
+
+
+class ParentRelation(BaseModel):
+    student_id : int
+    parent_id : int
+
+
+class MajorRelation(BaseModel):
+    major_id : int
+    teacher_id : int
+
+class Parent_output(BaseModel):
+    id : int
+    parent_type : str
     name : str
     lastname : str
     national_code : str
     phone_number : str
+
+
+class ParentBase(BaseModel):
+    parent_type : str
+    name : str
+    lastname : str
+    national_code : str
+    phone_number : str
+
     @field_validator("national_code",mode="after")
     @classmethod
     def check_national_code(cls,value:str) -> str:
         return validate_national_code(value)
-    
+
+    @field_validator("parent_type",mode="after")
+    @classmethod
+    def check_type(cls,value:str) -> str:
+        valid = ["father","mother"]
+        if not value.lower() in valid:
+            raise ValueError("Please enter mother or father for parent type field")
+        return value
+
     @field_validator("phone_number",mode="after")
     @classmethod 
     def check_phone_number(cls,value:str) -> str:

@@ -22,7 +22,7 @@ async def update_24_hours(conn:asyncpg.pool.Pool):
 async def lifespan(app: FastAPI):
     config = {
         'user':'postgres',
-        'password':'Aa123456@',
+        'password':'Aa123456',
         'database':'school_managment',
         'host':'localhost',
         'port': 5432

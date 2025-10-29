@@ -2,6 +2,7 @@ import asyncpg
 from fastapi.requests import Request
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+
 class DBManager:
     def __init__(self,config:dict):
         self._config = config
@@ -23,6 +24,7 @@ class DBManager:
     async def release(self, conn: asyncpg.Connection):
         if self._pool:
             await self._pool.release(conn)
+
     def get_pool(self) -> asyncpg.Pool:
         if not self._pool:
             raise RuntimeError("Pool not initialized")
